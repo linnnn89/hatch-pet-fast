@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fast Hatch Pet"
+  short_description: "Faster, leaner Codex v2 pet production"
+  default_prompt: "Use $hatch-pet-fast to create a validated Codex v2 pet from this reference with the lean production path."
