@@ -1,194 +1,199 @@
 ---
 name: hatch-pet-fast
-description: Quickly create a new, validated Codex v2 animated pet from a concrete image reference or clear character concept while minimizing image-generation retries, context use, and intermediate files. Use when the user explicitly wants a fast or token-efficient normal new-pet workflow. Route brand-only discovery, existing-atlas repair or upgrade, unusual renderer contracts, and unresolved pipeline failures to the full $hatch-pet skill.
+description: Create a new validated Codex v2 animated pet from a concrete image reference or clear character concept with an enforced generation budget, early semantic gates, deterministic repair routing, compact QA output, and minimal intermediates. Use for normal new-pet requests where speed or token efficiency matters. Route existing-atlas repair or migration, unusual renderer contracts, brand-only discovery, and unresolved pipeline failures to the full $hatch-pet skill.
 ---
 
 # Fast Hatch Pet
 
-Create a normal new Codex v2 pet through early visual gates, deterministic reuse, and compact worker handoffs. Preserve every release gate; save time by rejecting weak inputs early and avoiding unnecessary regeneration.
+Produce one standard Codex v2 pet with hard early gates. Save time by preventing bad art from reaching downstream stages, not by skipping release validation.
 
 ## Scope
 
-Use this fast path only when all are true:
+Use this path only when all are true:
 
-- The request is for one new pet.
-- A concrete reference image or sufficiently clear concept exists.
-- The standard Codex v2 atlas contract is appropriate.
-- No existing atlas must be repaired, migrated, or partially preserved.
+- one new pet is requested;
+- a concrete reference or clear concept exists;
+- the standard v2 atlas contract applies;
+- no existing atlas must be repaired, migrated, or preserved.
 
-Use the full `$hatch-pet` skill instead for brand-only discovery, an existing 8x9 or 8x11 atlas, nonstandard renderer behavior, manual cell repair, or a failure not covered by `references/failure-matrix.md`.
+Use full `$hatch-pet` for an existing atlas, nonstandard renderer behavior, manual cell repair, brand-only discovery, or a failure not covered by `references/failure-matrix.md`.
 
-## Required tools and source of truth
+## Required sources
 
-1. Read and follow the `$imagegen` skill before visual generation.
-2. Reuse the production scripts from `$CODEX_HOME/skills/hatch-pet/scripts`; do not copy or rewrite them. Use this skill's `scripts/check_frame_component_ownership.py` for the additional cross-slot component gate.
-3. Load the workspace dependency paths and use the returned Python executable exactly.
-4. Read `references/commands.md` only for the current deterministic stage.
-5. Read `references/failure-matrix.md` when a gate fails and before starting look-direction generation.
+1. Read `$imagegen` before visual generation.
+2. Reuse `$CODEX_HOME/skills/hatch-pet/scripts`; do not copy or rewrite production scripts.
+3. Use this skill's `scripts/check_frame_component_ownership.py` for cross-slot ownership and `scripts/fast_run_guard.py` for attempt and dependency gates.
+4. Load workspace dependencies and use the exact returned Python path.
+5. Read only the current section of `references/commands.md`.
+6. Read `references/failure-matrix.md` before look generation and whenever a gate fails.
 
-## Non-negotiable output contract
+## Release contract
 
-- Produce an `8 x 11` atlas at `1536 x 2288` pixels.
-- Use `192 x 208` cells.
-- Include all nine standard rows and all sixteen clockwise look directions.
-- Package with `spriteVersionNumber: 2`.
-- Generate visual art only with `$imagegen`; use scripts only for extraction, mirroring when safe, assembly, cleanup, measurement, and validation.
-- Generate a complete row again when its visual content fails. Never patch a final cell from an unrelated generation.
-- Require deterministic atlas validation, cardinal-direction blind QA, labeled direction semantics, continuity review, and independent final visual QA.
-- Never overwrite an existing package. Stop, version the name, or ask the user.
+- Atlas: `8 x 11`, `1536 x 2288`, `192 x 208` cells.
+- Content: nine standard rows plus sixteen clockwise look directions.
+- Package: `spriteVersionNumber: 2`.
+- Art: generate only with `$imagegen`; use scripts for extraction, safe mirroring, registration, whole-row transforms, assembly, cleanup, measurement, and validation.
+- Repair: regenerate a complete row only for visual/content failure. Never patch a final cell from another generation.
+- QA: require deterministic atlas validation, blind cardinal QA, labeled direction semantics, continuity review, component ownership where risky, and one final visual review.
+- Safety: never overwrite an existing pet package.
 
-## Lean run state
+## Attempt budget and machine guard
 
-Maintain one compact run note containing:
+The normal image-generation baseline is:
 
-- pet name and canonical identity lock;
-- exclusions and symmetry decision;
-- current stage and passed gates;
-- accepted warnings with visible evidence;
-- strategy changes after recurrent failures;
-- final package and QA paths.
+- base: 1;
+- nine standard rows: 9, minus any proven-safe deterministic mirror;
+- cardinal strip: 1;
+- look rows: 2.
 
-Keep prompts, manifests, and intermediate images inside the run directory. Do not paste long prompts, base64 data, or full manifests into the parent conversation.
+Default to a soft ceiling of 15 image-generation calls. Immediately before every call, record it with `fast_run_guard.py attempt`. The guard must refuse call 16. Continue beyond 15 only after reporting the failure classes and obtaining user approval.
 
-## Stage 0 — Lock identity and scan risks
+Initialize `qa/fast-run-ledger.json` at the start. Record every passed gate and failure class. Before `row9`, `row10`, raw assembly, despill, and packaging, run the corresponding guard requirement. Do not rely on prose memory or a stale `imagegen-jobs.json`.
 
-Write an identity lock of at most 100 words covering silhouette, palette, face, hair/ears, clothing or body material, and one or two essential distinguishing features.
+Never spend an image-generation call on:
 
-Remove from the canonical base unless the user explicitly needs them:
+- an exact chroma-background mismatch when identity and silhouette pass;
+- extraction or grouping failure with stable source art;
+- uniform scale, centering, baseline, or canvas registration drift;
+- chroma fringe before final cleanup;
+- a metric warning without a visible defect.
 
-- secondary characters or dolls;
-- watermark, signature, text, borders, and decorative background;
-- dispensable objects near the face or limbs;
-- detached sparkles, speed lines, dust, shadows, glows, and motion marks.
+Use deterministic exact-background recomposition, extraction, registration, or one uniform whole-row transform instead. Never transform individual final cells independently.
 
-Record these risks before generation:
+## Compact run state
 
-- bilateral asymmetry, handed props, colored limbs, one-sided ornaments;
-- long braids, tails, loops, ear ornaments, or other detached-looking parts;
-- intentional negative spaces that may look like alpha holes;
-- very wide poses that may exceed automatic component slots;
-- source colors close to the chosen chroma key.
+Maintain one short run note with identity, exclusions, symmetry, stage, attempt count by job, passed gates, one-line failure classes, accepted warnings, strategy changes, and final paths.
 
-Decide whether `running-left` may be mirrored. Mark it safe only if body design, markings, props, lighting, and visible accessories remain semantically correct after a horizontal flip. Otherwise plan a native left-facing row.
+Keep prompts, manifests, and detailed JSON inside the run directory. In the parent conversation:
 
-## Stage 1 — Build the canonical base
+- return only `selected_source=<path>` and one concrete QA sentence from visual jobs;
+- print only top-level `ok`, `errors`, `warnings`, size, mode, version, residue, and hash summaries;
+- never print full manifests, per-cell validation arrays, prompt bodies, or base64 data.
 
-Prepare the run with `prepare_pet_run.py`, then assign exactly one base-image job.
+## Stage 0 - Lock identity and risk
 
-The base must show one complete pet on a flat chroma background with no cropped extremities, secondary figure, guide marks, text, watermark, or detached effects. Approve identity and silhouette before requesting any animation row.
+Write an identity lock of at most 100 words covering silhouette, palette, face, hair or ears, clothing or material, and one or two distinguishing features.
 
-Copy only the selected result into the run directory and remove the task-generated duplicate after confirming the copy. Return from the visual job using only:
+Remove secondary figures, text, watermarks, scenery, shadows, detached effects, and dispensable face/limb-adjacent objects unless explicitly required.
 
-```text
-selected_source=<absolute path>
-qa_note=<one concrete sentence>
-```
+Record asymmetry, handed props, one-sided colors or ornaments, long or detached-looking appendages, intentional negative spaces, wide poses, and colors near the chroma key. Decide whether `running-left` is safe to mirror. Treat it as unsafe unless the actual generated right row preserves all semantics after a hypothetical flip.
 
-## Stage 2 — Gate standard motion early
+## Stage 1 - Approve one canonical base
 
-Generate `idle` and `running-right` first. Do not spend calls on the other seven rows until both pass extraction and visual review.
+Prepare a new run with `prepare_pet_run.py`, initialize the guard ledger, then issue one base job.
 
-For `running-right`, require a true screen-right side profile:
+Approve identity and silhouette before animation. If the only defect is non-exact chroma, deterministically key and recompose onto the exact run chroma; do not generate another base. Generate a second base only for a visible identity, anatomy, silhouette, clipping, or excluded-content failure.
 
-- nose, chin, torso, and gait point toward the right edge;
-- the far eye is hidden or clearly occluded when the design allows it;
-- the pose does not read as front-facing or merely three-quarter front;
-- limbs alternate and the body stays grounded.
+Pass the `base` gate only after visual and pixel checks succeed.
 
-If the same direction failure occurs twice, stop rewriting synonyms. Change the construction: use a strict 2D profile, simplify the prop or silhouette, hide the far eye, or redesign the pose family.
+## Stage 2 - Gate and parallelize standard motion
 
-After `running-right` passes, apply the recorded mirror decision:
+Generate `idle` and `running-right` first. Pass both gates before releasing any other standard row.
 
-- mirror deterministically only when the symmetry checklist still passes on the generated row;
-- otherwise generate `running-left` natively and verify asymmetric markings and prop handedness.
+Require `running-right` to be a true screen-right profile: nose, chin, torso, and gait point right; the far eye is hidden or clearly occluded where the design allows; limbs alternate; the body stays grounded. After two failures with the same root cause, change the construction instead of rewriting synonyms.
 
-Generate the remaining six standard rows in parallel only after the gate passes. Extract and inspect every returned row immediately. Classify a failure before acting:
+After the early gate:
 
-- **Visual/content failure:** regenerate the complete row.
-- **Stable source but failed component grouping:** retry deterministic extraction with `stable-slots` and explicitly allow it during inspection.
-- **Chroma fringe only:** defer to the single final despill pass; do not regenerate.
-- **Intentional holes or gaps:** inspect at high contrast and record evidence; do not repair merely because a metric flags them.
+- mirror `running-left` only after proving symmetry on the generated right row;
+- otherwise generate it natively;
+- release the remaining visual jobs in waves of at most three concurrent calls when the host permits;
+- extract and inspect each returned row immediately before starting a replacement call.
 
-Treat `stable-slots` as a geometry fallback only. It can stabilize scale and placement while silently assigning a long braid, tail, hair lock, ornament, or other disconnected piece from an adjacent pose to the current frame. It does not prove component ownership.
+Classify before acting:
 
-After every `stable-slots` row, and after any row containing long or detached-looking appendages, run `scripts/check_frame_component_ownership.py` on the extracted frames. Keep its black-background sheet in QA. By default, fail any frame with a second alpha component of at least 25 pixels. If the design intentionally contains separate opaque parts, use `--allow-secondary` only after visually assigning every reported component to the current pose and recording that evidence.
+- visual/content failure: regenerate the complete row;
+- stable art with grouping failure: use deterministic extraction or `stable-slots`;
+- uniform scale/registration drift: apply one deterministic whole-row transform and re-inspect;
+- chroma-only or metric-only issue: do not regenerate.
 
-Classify a component that appears in only one or two frames, jumps sides, resembles the neighboring pose, or floats outside the current silhouette as a visual/content failure. Regenerate the complete row. Never erase the fragment from a final cell, and never accept the row only because `inspect_frames.py --allow-stable-slots` passes.
+Run component ownership and inspect a black sheet after every `stable-slots` extraction and every row with a plausible detached hair lock, braid, tail, loop, ornament, or prop. Fail a component that appears in only one or two frames, jumps sides, resembles a neighbor, or floats outside the current pose. Do not run this expensive gate on clearly single-component low-risk rows merely by habit.
 
-## Stage 3 — Review standard motion once
+## Stage 3 - Review standard motion once
 
-Assemble the 8x9 intermediate atlas only after all nine rows pass their immediate checks. Build one contact sheet and the animation GIFs, then review identity, scale, baseline, attachments, direction, gait, and playback continuity.
+After all nine rows pass immediate checks, assemble one 8x9 atlas, one contact sheet, and the animation previews. Review identity, scale, baseline, attachments, direction, gait, and playback once.
 
-Do not repeatedly open every source PNG in the parent context. Use row workers for local checks and reserve parent visual inspection for the canonical base, contact sheet, GIFs, direction sheet, and final extended contact sheet.
+Reserve parent visual inspection for the canonical base, standard contact sheet, necessary GIFs, direction sheet, and final contact sheet. Open individual source strips only to diagnose a failed gate.
 
-Block the look stage for a visible identity change, clipped body, wrong direction, broken attachment, cross-frame component, detached hair or appendage, reversed gait, inert animation, or conspicuous pop. Inspect high-risk rows on black; checkerboard transparency can hide a small neighboring-frame fragment. Ignore raw chroma fringe at this stage.
+Pass `standard-motion` only when no identity change, clipping, wrong direction, broken attachment, cross-frame component, inert animation, or conspicuous pop remains.
 
-## Stage 4 — Build look directions in dependency order
+## Stage 4 - Prove look semantics before downstream work
 
-Write a short pet-specific look-mechanics note: what remains anchored, what leads the gaze, what follows, which parts occlude, and how props behave. Define viewer/screen coordinates explicitly.
+Write a short look-mechanics note defining screen coordinates, anchored parts, gaze leaders, followers, occlusion, and prop behavior.
 
-Generate and approve one four-cardinal strip in this order:
+Generate and approve cardinals in this exact order:
 
 1. `000` up
 2. `090` screen-right
 3. `180` down
 4. `270` screen-left
 
-Cardinals are hard gates. For faces, use visible head, nose, pupil, eyelid, and occlusion evidence; do not accept every pose remaining front-facing. Repair a bad cardinal anchor before generating look rows.
+Cardinals are hard gates. Do not continue if `090` or `270` is front-facing, ambiguous, or reversed.
 
-Generate row 9 as one coherent eight-pose family, register and inspect it immediately, and continue only when no hard semantic or continuity failure remains. Then generate row 10 from the approved cardinals plus completed row 9 and inspect it immediately. Never generate both rows speculatively.
+Generate row 9, register it, and inspect a labeled normal-size strip before row 10. Hard requirements:
 
-Keep image-generation references at five or fewer. Use this priority order:
+- `022.5` through `157.5` retain the screen-right facial half-plane;
+- `112.5`, `135`, and `157.5` visibly progress toward down;
+- no slot reverses quadrant, clips, changes identity, or snaps in scale.
 
-1. matching layout guide;
-2. canonical base;
-3. standard-motion contact sheet;
-4. approved cardinal strip;
-5. completed row 9, for row 10 only.
+Pass `look-row-9-semantics`, then run the guard for `row10`. If row 9 fails, row 10, raw atlas assembly, despill, and final blind QA are forbidden.
 
-If a canonical base has already captured the original reference faithfully, omit the redundant large original reference and record that decision. Never omit a required identity or direction source merely to satisfy the limit.
+Generate row 10 from approved cardinals plus passed row 9. Hard requirements:
 
-## Stage 5 — Assemble, validate, and package
+- `202.5` through `337.5` retain the screen-left facial half-plane;
+- `292.5`, `315`, and `337.5` visibly progress toward up;
+- the `157.5 -> 180 -> 202.5` and `337.5 -> 000` boundaries remain continuous.
 
-1. Assemble the complete 8x11 atlas.
-2. Run chroma despill exactly once on the complete atlas.
-3. Validate the cleaned atlas with the v2 requirement.
-4. Create the extended contact sheet, labeled direction sheet, blind direction pairs, and continuity report.
-5. Obtain exactly three isolated blind verdicts and combine them by strict majority.
-6. Require both cardinal axis pairs to pass. Treat intermediate blind disagreement as a warning only when labeled normal-size loop review confirms the intended quadrant and shows no reversal.
-7. Run one independent final visual QA pass.
-8. Package only after every hard gate passes.
+If semantics pass but size differs, register or uniformly scale the whole row; do not generate again. Pass `look-row-10-semantics` only after the registered result passes.
 
-When the despill report has `ok: true` and v2 atlas validation passes, treat chroma cleanup as closed. Do not regenerate art, tune thresholds repeatedly, or invent a second cleanup step because of perceived fringe.
+Use at most five image references in priority order: layout, canonical base, standard contact sheet, cardinals, and passed row 9 for row 10. Omit the original reference after faithful canonicalization when necessary.
 
-After packaging, keep the final WebP, validation JSON, despill report, extended contact sheet, direction sheet, blind QA artifacts, semantics, continuity, previews, review, request, and run summary. Remove task-only prompts, layout guides, generated strips, extracted frames, PNG intermediates, 8x9 atlas, and manifest unless the user asks to preserve debug material.
+## Stage 5 - Preflight raw art, then clean once
 
-## Efficiency rules
+Require both look-row semantic gates before assembling one raw 8x11 candidate.
 
-- Use at most three concurrent visual jobs; preserve dependency order.
-- Give each visual worker one bounded job and the minimum required references.
-- Return only the selected path and a concrete QA sentence.
-- Inspect deterministic outputs immediately; late discovery multiplies regeneration cost.
-- Do not retry image generation for an extraction-only, chroma-only, or metric-only issue.
-- After two recurrences of one root failure, change strategy and record it.
-- Treat cardinal ambiguity as a hard failure; treat an intermediate metric warning as evidence to inspect, not an automatic retry.
-- Prefer a deterministic mirror or `stable-slots` only after its safety condition is proven.
-- Never treat stable playback as proof of component ownership; require the component report and black-background sheet for every `stable-slots` or long-appendage row.
-- Assemble expensive global artifacts once per accepted state, not after every row.
+Before despill, generate from the raw candidate:
+
+1. contact review;
+2. labeled direction review;
+3. blind direction pairs and exactly three isolated verdicts;
+4. continuity report.
+
+The green background is acceptable for this preflight. Require both cardinal axis pairs, all labeled quadrants, and visible continuity to pass. Treat intermediate blind disagreement as review-only when labeled normal-size evidence confirms the intended quadrant without reversal.
+
+Only after `raw-contact`, `raw-labeled-direction`, `raw-blind-direction`, and `raw-continuity` pass may the guard allow `despill`.
+
+Then:
+
+1. despill the accepted raw atlas exactly once;
+2. validate the cleaned atlas with v2, chroma, RGBA, dimensions, residue, and cell checks;
+3. create the cleaned final contact sheet and run one independent visual review;
+4. package only the cleaned WebP and valid `pet.json`;
+5. validate the packaged copy and compare its hash with the accepted cleaned atlas.
+
+After despill reports `ok: true` and validation passes, cleanup is closed. Do not tune thresholds, run a second despill, or regenerate art for perceived fringe without a reproducible validation failure.
+
+## Failure and cleanup policy
+
+Count failures by root cause. After two occurrences, change construction, cardinal family, complexity, symmetry, or deterministic method. See `references/failure-matrix.md`.
+
+After success, keep the package, accepted final WebP, compact validation and despill reports, final contact and direction sheets, blind majority/validation, semantics, continuity, previews, final review, request, and run summary.
+
+Remove only task-created intermediates inside the confirmed run directory: prompts, duplicated guides, extracted frames, generated strips, obsolete raw/cleaned atlas versions, full per-cell debug JSON, and manifests. Keep at most one representative rejected artifact per root cause when it materially documents a repair. Never delete the source reference, installed package, or user files.
 
 ## Completion checklist
 
-- [ ] Canonical identity lock and exclusions are recorded.
-- [ ] Mirror safety is explicitly decided.
-- [ ] `idle` and `running-right` passed before bulk generation.
+- [ ] Guard ledger exists and image-generation attempts are within the approved budget.
+- [ ] Identity, exclusions, symmetry, and risks are recorded.
+- [ ] Base passed; chroma-only issues used deterministic repair.
+- [ ] `idle` and `running-right` passed before remaining standard jobs.
 - [ ] Nine standard rows passed immediate and playback QA.
-- [ ] Every `stable-slots` or long-appendage row passed component-ownership QA on black.
-- [ ] Look mechanics and four cardinals are approved.
-- [ ] Row 9 passed before row 10 began.
-- [ ] Final atlas is `1536 x 2288`, v2, and deterministically valid.
-- [ ] Despill ran exactly once and reports success.
-- [ ] Three blind verdicts were combined; cardinal pairs pass.
-- [ ] Labeled semantics and continuity contain no hard failure.
+- [ ] Risky rows passed component ownership on black.
+- [ ] Cardinals passed.
+- [ ] Row 9 semantics passed before row 10 began.
+- [ ] Row 10 semantics passed before raw atlas assembly.
+- [ ] Raw contact, labeled, blind, and continuity gates passed before despill.
+- [ ] Despill ran exactly once.
+- [ ] Final atlas is RGBA `1536 x 2288`, v2, and deterministically valid.
 - [ ] Independent final visual QA passed.
-- [ ] A new package was created without overwriting an existing one.
-- [ ] Task-only intermediates were cleaned after success.
+- [ ] New package and matching hash passed without overwrite.
+- [ ] Task-only intermediates were cleaned.
