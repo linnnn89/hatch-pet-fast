@@ -1,4 +1,4 @@
 interface:
   display_name: "Fast Hatch Pet"
-  short_description: "Budgeted, gated Codex v2 pet production"
-  default_prompt: "Use $hatch-pet-fast to create this Codex v2 pet with early semantic gates, deterministic repairs, and compact QA."
+  short_description: "Fast, scale-locked Codex v2 pet production"
+  default_prompt: "Use $hatch-pet-fast to create this Codex v2 pet with shared scale, duplicate-lane gates, and compact QA."

@@ -4,6 +4,12 @@ Fast Hatch Pet is a lean, gated workflow for creating a new, validated Codex v2 
 
 Fast Hatch Pet 是一套精简且带质量门控的工作流，用于根据参考图片或清晰角色设定，快速制作通过验证的 Codex v2 动画宠物。
 
+## Version 3 / 版本 3
+
+Version 3 adds a canonical cross-action scale profile, conditional whole-lane repair, decoded-pixel duplicate detection, one-line QA aggregation, and executable policy regression tests. Scale-correct rows are left untouched; only visible-content failures consume another image-generation call.
+
+版本 3 新增跨动作统一尺度档案、条件式整行修复、解码像素级重复动画检测、单行 QA 汇总和可执行的策略回归测试。尺度合格的动作不会被重复插值；只有真正的视觉内容失败才再次消耗图片生成调用。
+
 ## Version 2 / 版本 2
 
 Version 2 turns the lean workflow into enforceable release gates. It adds a 15-call default image-generation budget, a machine-readable dependency guard, deterministic repair routing for chroma and whole-row scale issues, mandatory row 9/10 direction checks before atlas assembly, raw semantic QA before the single despill pass, compact validator output, and scoped cleanup.
@@ -24,9 +30,10 @@ Version 2 turns the lean workflow into enforceable release gates. It adds a 15-c
 
 1. 锁定角色身份、轮廓、配色和必须保留的特征。
 2. 先生成并验收 canonical base，再只测试 `idle` 与 `running-right`。
-3. 早期动作门控通过后，才生成其余标准动作；只有确认对称安全时才镜像。
-4. 先验证四个基准视角；row 9 通过右侧面部半平面检查后才允许生成 row 10，两行均通过后才允许拼装原始图集。
-5. 原始图集先通过接触表、标注方向、三轮盲测和连续性预检，再执行唯一一次去绿、v2 验证和最终视觉 QA。
+3. 从 `idle` 建立统一尺度档案；其余落地动作只在超出阈值时进行一次整行修复。
+4. 早期动作门控通过后，才生成其余标准动作；8×9 和 8×11 拼装前分别阻断像素相同的错误动画行。
+5. 先验证四个基准视角；row 9 通过右侧面部半平面检查后才允许生成 row 10，两行均通过后才允许拼装原始图集。
+6. 原始图集先通过接触表、标注方向、三轮盲测和连续性预检，再执行唯一一次去绿、v2 验证、最终视觉 QA 和单行汇总。
 
 特别防坑：`stable-slots` 只能稳定几何位置，不能证明头发、辫子、尾巴等分离部件属于当前帧。所有使用 `stable-slots` 或含长附属物的动作行，都必须运行 `scripts/check_frame_component_ownership.py`，并检查黑底预览。默认把面积不少于 25 像素的第二透明组件视为硬门控，防止“隔壁一帧的头发凭空出现”。
 
@@ -74,9 +81,10 @@ Use the full `$hatch-pet` skill for existing-atlas repair, 8×9 migration, nonst
 
 1. Lock the character identity, silhouette, palette, and essential features.
 2. Approve one canonical base, then gate production with only `idle` and `running-right`.
-3. Generate the remaining standard motions only after the early gate passes; mirror only when semantic symmetry is proven.
-4. Approve four cardinals; require row 9 facial-half-plane semantics before row 10, and require both look rows before raw atlas assembly.
-5. Run raw contact, labeled direction, three-verdict blind, and continuity preflight before the single despill pass, v2 validation, and final visual QA.
+3. Build one shared scale profile from `idle`; conditionally repair only grounded lanes that exceed its tolerance.
+4. Generate the remaining standard motions only after the early gate passes; block decoded-pixel duplicate lanes before both atlas assemblies.
+5. Approve four cardinals; require row 9 facial-half-plane semantics before row 10, and require both look rows before raw atlas assembly.
+6. Run raw contact, labeled direction, three-verdict blind, and continuity preflight before the single despill pass, v2 validation, final visual QA, and one-line summary.
 
 Important safeguard: `stable-slots` stabilizes geometry but does not prove that a braid, hair lock, tail, or other detached component belongs to the current frame. Every `stable-slots` or long-appendage row must pass `scripts/check_frame_component_ownership.py` and black-background review. By default, a secondary alpha component of at least 25 pixels is a hard failure. This specifically catches one-frame fragments borrowed from a neighboring pose.
 
@@ -103,11 +111,16 @@ $hatch-pet-fast Create a Codex v2 pet named KOTORI from this reference image.
 ├── references/
 │   ├── commands.md
 │   └── failure-matrix.md
-└── scripts/
+├── scripts/
+    ├── check_duplicate_lanes.py
     ├── check_frame_component_ownership.py
-    └── fast_run_guard.py
+    ├── fast_qa_summary.py
+    ├── fast_run_guard.py
+    └── lane_scale_profile.py
+└── tests/
+    └── test_fast_hatch_pet.py
 ```
 
-`SKILL.md` is the authoritative workflow. The reference files contain deterministic command recipes and failure routing. `check_frame_component_ownership.py` catches cross-slot fragments; `fast_run_guard.py` records attempts and blocks out-of-order expensive stages.
+`SKILL.md` is the authoritative workflow. The bundled scripts enforce component ownership, pixel-level lane uniqueness, shared scale, compact QA, and stage dependencies; the tests keep their ordering and safety policies from regressing.
 
-`SKILL.md` 是权威工作流；参考文件提供确定性命令与失败分流。`check_frame_component_ownership.py` 检查跨帧碎片，`fast_run_guard.py` 记录生成次数并阻止越过门槛的昂贵步骤。
+`SKILL.md` 是权威工作流；附带脚本执行组件归属、像素级动画行唯一性、统一尺度、紧凑 QA 和阶段依赖门控；测试用于防止这些顺序与安全策略在后续版本中回退。

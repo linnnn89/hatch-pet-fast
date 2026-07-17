@@ -1,6 +1,6 @@
 ---
 name: hatch-pet-fast
-description: Create a new validated Codex v2 animated pet from a concrete image reference or clear character concept with an enforced generation budget, early semantic gates, deterministic repair routing, compact QA output, and minimal intermediates. Use for normal new-pet requests where speed or token efficiency matters. Route existing-atlas repair or migration, unusual renderer contracts, brand-only discovery, and unresolved pipeline failures to the full $hatch-pet skill.
+description: Create a new validated Codex v2 animated pet from a concrete image reference or clear character concept with an enforced generation budget, shared cross-action scale, duplicate-lane blocking, early semantic gates, conditional deterministic repair, compact QA output, and minimal intermediates. Use for normal new-pet requests where speed, pixel consistency, or token efficiency matters. Route existing-atlas repair or migration, unusual renderer contracts, brand-only discovery, and unresolved pipeline failures to the full $hatch-pet skill.
 ---
 
 # Fast Hatch Pet
@@ -22,7 +22,7 @@ Use full `$hatch-pet` for an existing atlas, nonstandard renderer behavior, manu
 
 1. Read `$imagegen` before visual generation.
 2. Reuse `$CODEX_HOME/skills/hatch-pet/scripts`; do not copy or rewrite production scripts.
-3. Use this skill's `scripts/check_frame_component_ownership.py` for cross-slot ownership and `scripts/fast_run_guard.py` for attempt and dependency gates.
+3. Use this skill's scripts for cross-slot ownership, duplicate-lane blocking, shared scale, compact QA, and dependency gates.
 4. Load workspace dependencies and use the exact returned Python path.
 5. Read only the current section of `references/commands.md`.
 6. Read `references/failure-matrix.md` before look generation and whenever a gate fails.
@@ -49,6 +49,8 @@ The normal image-generation baseline is:
 Default to a soft ceiling of 15 image-generation calls. Immediately before every call, record it with `fast_run_guard.py attempt`. The guard must refuse call 16. Continue beyond 15 only after reporting the failure classes and obtaining user approval.
 
 Initialize `qa/fast-run-ledger.json` at the start. Record every passed gate and failure class. Before `row9`, `row10`, raw assembly, despill, and packaging, run the corresponding guard requirement. Do not rely on prose memory or a stale `imagegen-jobs.json`.
+
+Also require `bulk-standard` after the early motion gate, `assemble-standard` before the 8x9 review atlas, and `assemble-raw` before the 8x11 raw atlas. These stages bind scale and lane-uniqueness evidence to the run ledger instead of relying on visual memory.
 
 Never spend an image-generation call on:
 
@@ -92,12 +94,16 @@ Generate `idle` and `running-right` first. Pass both gates before releasing any 
 
 Require `running-right` to be a true screen-right profile: nose, chin, torso, and gait point right; the far eye is hidden or clearly occluded where the design allows; limbs alternate; the body stays grounded. After two failures with the same root cause, change the construction instead of rewriting synonyms.
 
+Create `qa/canonical-scale-profile.json` from the approved extracted `idle` frames. Audit `running-right` against it and pass `scale-profile` plus `running-right-scale` before requiring `bulk-standard`. The profile records shared standing-equivalent height, visible-area scale, center, feet baseline, and allowed drift; it does not normalize each frame independently or replace visual size review.
+
 After the early gate:
 
 - mirror `running-left` only after proving symmetry on the generated right row;
 - otherwise generate it natively;
 - release the remaining visual jobs in waves of at most three concurrent calls when the host permits;
 - extract and inspect each returned row immediately before starting a replacement call.
+
+Audit each scale-compatible grounded row against the canonical scale profile immediately after extraction. A row within tolerance passes unchanged. Treat a silhouette-changing pose such as waving, failed, crouching, or jumping as review-only unless normal-size playback confirms that the whole character was zoomed. For a confirmed, semantically correct size outlier, use `lane_scale_profile.py repair` into a new directory and re-run extraction, component, edge, playback, and scale checks. Use one scale factor for the complete row; use `--anchor-mode lowest` for jumping so the arc is preserved. Default to nearest-neighbor resampling for pixel art. Never overwrite source frames or resize final cells independently.
 
 Classify before acting:
 
@@ -110,7 +116,9 @@ Run component ownership and inspect a black sheet after every `stable-slots` ext
 
 ## Stage 3 - Review standard motion once
 
-After all nine rows pass immediate checks, assemble one 8x9 atlas, one contact sheet, and the animation previews. Review identity, scale, baseline, attachments, direction, gait, and playback once.
+After all nine rows pass immediate checks, aggregate their scale reports and run `check_duplicate_lanes.py` on the nine accepted source strips. Pixel-identical lanes are a hard failure even when their file encodings differ. Pass `standard-scale-audit` and `standard-lane-uniqueness`, then require `assemble-standard`.
+
+Assemble one 8x9 atlas, one contact sheet, and the animation previews. Review identity, scale, baseline, attachments, direction, gait, and playback once.
 
 Reserve parent visual inspection for the canonical base, standard contact sheet, necessary GIFs, direction sheet, and final contact sheet. Open individual source strips only to diagnose a failed gate.
 
@@ -143,13 +151,13 @@ Generate row 10 from approved cardinals plus passed row 9. Hard requirements:
 - `292.5`, `315`, and `337.5` visibly progress toward up;
 - the `157.5 -> 180 -> 202.5` and `337.5 -> 000` boundaries remain continuous.
 
-If semantics pass but size differs, register or uniformly scale the whole row; do not generate again. Pass `look-row-10-semantics` only after the registered result passes.
+If semantics pass but size differs, register or uniformly scale the whole row; do not generate again. Pass `look-row-10-semantics` only after the registered result passes. Do not apply the grounded-body scale profile to look rows; their direction registration remains authoritative.
 
 Use at most five image references in priority order: layout, canonical base, standard contact sheet, cardinals, and passed row 9 for row 10. Omit the original reference after faithful canonicalization when necessary.
 
 ## Stage 5 - Preflight raw art, then clean once
 
-Require both look-row semantic gates before assembling one raw 8x11 candidate.
+Require both look-row semantic gates before assembling one raw 8x11 candidate. Before assembly, run duplicate-lane detection across all nine standard strips and both accepted look strips, then pass `all-lane-uniqueness` and require `assemble-raw`.
 
 Before despill, generate from the raw candidate:
 
@@ -170,6 +178,8 @@ Then:
 4. package only the cleaned WebP and valid `pet.json`;
 5. validate the packaged copy and compare its hash with the accepted cleaned atlas.
 
+Feed the detailed release reports to `fast_qa_summary.py`. Keep its JSON on disk and print only its single-line `PASS/FAIL`, check count, error count, warning count, and failed labels. Open a detailed input report only when its label fails.
+
 After despill reports `ok: true` and validation passes, cleanup is closed. Do not tune thresholds, run a second despill, or regenerate art for perceived fringe without a reproducible validation failure.
 
 ## Failure and cleanup policy
@@ -186,14 +196,18 @@ Remove only task-created intermediates inside the confirmed run directory: promp
 - [ ] Identity, exclusions, symmetry, and risks are recorded.
 - [ ] Base passed; chroma-only issues used deterministic repair.
 - [ ] `idle` and `running-right` passed before remaining standard jobs.
+- [ ] Canonical scale profile exists; grounded standard rows passed or received one whole-row conditional repair.
 - [ ] Nine standard rows passed immediate and playback QA.
+- [ ] Nine standard strips passed pixel-level duplicate detection before 8x9 assembly.
 - [ ] Risky rows passed component ownership on black.
 - [ ] Cardinals passed.
 - [ ] Row 9 semantics passed before row 10 began.
 - [ ] Row 10 semantics passed before raw atlas assembly.
+- [ ] All eleven accepted strips passed duplicate detection before raw 8x11 assembly.
 - [ ] Raw contact, labeled, blind, and continuity gates passed before despill.
 - [ ] Despill ran exactly once.
 - [ ] Final atlas is RGBA `1536 x 2288`, v2, and deterministically valid.
 - [ ] Independent final visual QA passed.
 - [ ] New package and matching hash passed without overwrite.
+- [ ] Compact QA summary passed; detailed reports remained on disk.
 - [ ] Task-only intermediates were cleaned.

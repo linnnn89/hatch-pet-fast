@@ -9,7 +9,9 @@ Load only the section needed for the current stage. The full argument contract r
 - [Guard ledger](#guard-ledger)
 - [Extract and inspect one standard row](#extract-and-inspect-one-standard-row)
 - [Check component ownership](#check-component-ownership)
+- [Create, audit, and conditionally repair shared scale](#create-audit-and-conditionally-repair-shared-scale)
 - [Derive a proven-safe running-left row](#derive-a-proven-safe-running-left-row)
+- [Block duplicate lanes](#block-duplicate-lanes)
 - [Standard atlas and review artifacts](#standard-atlas-and-review-artifacts)
 - [Cardinal anchors](#cardinal-anchors)
 - [Register row 9, then assemble row 10](#register-row-9-then-assemble-row-10)
@@ -72,12 +74,13 @@ Require dependencies before expensive stages:
 
 ```powershell
 & $Python "$FastSkillDir\scripts\fast_run_guard.py" require --ledger $Ledger --stage row10
+& $Python "$FastSkillDir\scripts\fast_run_guard.py" require --ledger $Ledger --stage assemble-standard
 & $Python "$FastSkillDir\scripts\fast_run_guard.py" require --ledger $Ledger --stage assemble-raw
 & $Python "$FastSkillDir\scripts\fast_run_guard.py" require --ledger $Ledger --stage despill
 & $Python "$FastSkillDir\scripts\fast_run_guard.py" require --ledger $Ledger --stage package
 ```
 
-Allowed gate names are free-form. The guarded dependencies use: `idle`, `running-right`, `base`, `standard-motion`, `cardinals`, `look-row-9-semantics`, `look-row-10-semantics`, `raw-contact`, `raw-labeled-direction`, `raw-blind-direction`, `raw-continuity`, `despill`, `atlas-validation`, and `final-visual`.
+Allowed gate names are free-form. The guarded dependencies additionally use `scale-profile`, `running-right-scale`, `standard-scale-audit`, `standard-lane-uniqueness`, and `all-lane-uniqueness`.
 
 ## Extract and inspect one standard row
 
@@ -122,6 +125,53 @@ $FastSkillDir = Join-Path $env:CODEX_HOME 'skills\hatch-pet-fast'
 
 The default hard gate fails any frame with a secondary alpha component of at least 25 pixels. Use `--allow-secondary` only for a design with intentional separate opaque parts, then visually assign every warning to the current pose on the black sheet. Stable playback without this check is insufficient.
 
+## Create, audit, and conditionally repair shared scale
+
+Create one profile from accepted extracted `idle` frames:
+
+```powershell
+& $Python "$FastSkillDir\scripts\lane_scale_profile.py" create `
+  --frames-dir "$RunDir\decoded\frames\idle" `
+  --output "$RunDir\qa\canonical-scale-profile.json"
+```
+
+Audit every grounded standard row and keep the detailed JSON on disk:
+
+```powershell
+& $Python "$FastSkillDir\scripts\lane_scale_profile.py" audit `
+  --profile "$RunDir\qa\canonical-scale-profile.json" `
+  --frames-dir "$RunDir\decoded\frames\<row>" --row '<row>' `
+  --json-out "$RunDir\qa\<row>-scale.json"
+```
+
+The default `--metric auto` compares both alpha-bbox height and the square root of visible-alpha area. The area proxy catches rows that an extractor normalized back to full cell height despite a visible zoom. For a visibly confirmed silhouette-changing pose whose body scale does not pop during normal-size playback, repeat the audit with `--pose-variant`. This converts metric drift into a review warning. Do not use it to waive an actually shrunken jumping lane or a cross-action zoom.
+
+If and only if a visually correct row fails the size gate, repair the complete row into a new directory:
+
+```powershell
+& $Python "$FastSkillDir\scripts\lane_scale_profile.py" repair `
+  --profile "$RunDir\qa\canonical-scale-profile.json" `
+  --frames-dir "$RunDir\decoded\frames\<row>" --row '<row>' `
+  --output-dir "$RunDir\decoded\frames\<row>-scale-repaired" `
+  --json-out "$RunDir\qa\<row>-scale-repair.json" `
+  --anchor-mode median --resample nearest
+```
+
+For `jumping`, use `--anchor-mode lowest` so the lowest pose keeps the canonical feet baseline while every frame's vertical offset remains part of the arc. Never point `--output-dir` at the source directory. After repair, rerun row inspection, risky-component QA, playback review, and scale audit.
+
+Aggregate the accepted per-row audit and repair reports. Include only rows whose body scale is meaningfully comparable; include pose-variant reports when their warning was visually confirmed.
+
+```powershell
+& $Python "$FastSkillDir\scripts\fast_qa_summary.py" `
+  --input "idle=$RunDir\qa\idle-scale.json" `
+  --input "running-right=$RunDir\qa\running-right-scale.json" `
+  --input "running-left=$RunDir\qa\running-left-scale.json" `
+  --input "waiting=$RunDir\qa\waiting-scale.json" `
+  --input "running=$RunDir\qa\running-scale.json" `
+  --input "review=$RunDir\qa\review-scale.json" `
+  --json-out "$RunDir\qa\standard-scale-summary.json"
+```
+
 ## Derive a proven-safe running-left row
 
 ```powershell
@@ -129,6 +179,26 @@ The default hard gate fails any frame with a secondary alpha component of at lea
 ```
 
 Use only after visually approving `running-right` and rechecking symmetry on the actual generated row. Otherwise generate left natively.
+
+## Block duplicate lanes
+
+Run the checker on explicit accepted strips. It compares decoded RGBA pixels, not only file bytes, so different PNG encodings cannot hide a duplicated animation.
+
+```powershell
+& $Python "$FastSkillDir\scripts\check_duplicate_lanes.py" `
+  --lane "idle=$RunDir\decoded\idle.png" `
+  --lane "running-right=$RunDir\decoded\running-right.png" `
+  --lane "running-left=$RunDir\decoded\running-left.png" `
+  --lane "waving=$RunDir\decoded\waving.png" `
+  --lane "jumping=$RunDir\decoded\jumping.png" `
+  --lane "failed=$RunDir\decoded\failed.png" `
+  --lane "waiting=$RunDir\decoded\waiting.png" `
+  --lane "running=$RunDir\decoded\running.png" `
+  --lane "review=$RunDir\decoded\review.png" `
+  --json-out "$RunDir\qa\standard-lane-uniqueness.json"
+```
+
+Run it again with the two accepted look strips before 8x11 assembly. Do not delete a duplicate automatically. Classify which job returned the wrong artifact, invalidate only that lane, and regenerate or recopy it from its bound generation result.
 
 ## Standard atlas and review artifacts
 
@@ -196,15 +266,19 @@ Create the final cleaned contact sheet and perform one independent visual review
 
 ## Compact result output
 
-Write detailed JSON to disk. Print only a compact projection to the parent context:
+Write detailed JSON to disk, then aggregate only the required release reports:
 
 ```powershell
-$Result = Get-Content -LiteralPath '<validation.json>' -Raw | ConvertFrom-Json
-$Result | Select-Object ok,format,mode,columns,rows,width,height,`
-  sprite_version_number,transparent_rgb_residue_pixels,errors,warnings
+& $Python "$FastSkillDir\scripts\fast_qa_summary.py" `
+  --input "validation=$RunDir\qa\validation.json" `
+  --input "despill=$RunDir\qa\despill-report.json" `
+  --input "duplicates=$RunDir\qa\all-lane-uniqueness.json" `
+  --input "scale=$RunDir\qa\standard-scale-summary.json" `
+  --input "final-visual=$RunDir\qa\final-visual-qa.json" `
+  --json-out "$RunDir\qa\fast-qa-summary.json"
 ```
 
-Never print `cells`, manifests, prompt bodies, or full component arrays unless diagnosing a specific failure.
+The script prints one line. Never print `checks`, `cells`, manifests, prompt bodies, or full component arrays unless the compact summary names that report as failed.
 
 ## Package
 
