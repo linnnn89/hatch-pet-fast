@@ -13,10 +13,18 @@ from pathlib import Path
 SCHEMA_VERSION = 1
 DEFAULT_BUDGET = 15
 PREREQUISITES = {
-    "bulk-standard": ["idle", "running-right"],
+    "bulk-standard": ["idle", "running-right", "scale-profile", "running-right-scale"],
+    "assemble-standard": [
+        "standard-scale-audit",
+        "standard-lane-uniqueness",
+    ],
     "row9": ["base", "standard-motion", "cardinals"],
     "row10": ["look-row-9-semantics"],
-    "assemble-raw": ["look-row-9-semantics", "look-row-10-semantics"],
+    "assemble-raw": [
+        "look-row-9-semantics",
+        "look-row-10-semantics",
+        "all-lane-uniqueness",
+    ],
     "despill": [
         "raw-contact",
         "raw-labeled-direction",
